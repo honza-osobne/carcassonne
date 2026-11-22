@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Carcassonne Počítadlo</title>
+  <style>
+    :root {
+      --bg: #0b0d11;
+      --surface: #141820;
+      --btn-bg: #3e4045;
+      --btn-bg-neg: #893e3e;
+      --btn-hi: #232d42;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --pos-bg: #12382b;
+      --pos-fg: #34d399;
+      --neg-bg: #451a1a;
+      --neg-fg: #f87171;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* Horní lišta - bez linek, jen čisté plochy */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 8px 10px;
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+
+    .bar-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    button {
+      font-family: inherit;
+      font-weight: 800;
+      color: var(--text);
+      background: var(--btn-bg);
+      border: none;
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-size: 0.92rem;
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: transform 0.05s ease, background-color 0.12s ease;
+    }
+
+    button:active {
+      transform: scale(0.96);
+    }
+
+    button:disabled {
+      opacity: 0.32;
+      pointer-events: none;
+    }
+
+    button.toggle-on {
+      background: #2563eb;
+      color: #ffffff;
+    }
+
+    button.has-redo {
+      background: #334155;
+      color: #93c5fd;
+    }
+
+    .last-delta {
+      font-size: 0.88rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 135px;
+    }
+
+    /* Plocha hráčů */
+    main {
+      flex: 1;
+      display: grid;
+      gap: 8px;
+      padding: 8px 10px;
+      min-height: 0;
+    }
+
+    main[data-count="2"] {
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr;
+    }
+
+    main[data-count="3"],
+    main[data-count="4"] {
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+    }
+
+    main[data-count="5"],
+    main[data-count="6"] {
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: repeat(3, 1fr);
+    }
+
+    @media (min-width: 768px) {
+      main[data-count="3"] {
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: 1fr;
+      }
+      main[data-count="5"],
+      main[data-count="6"] {
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: 1fr 1fr;
+      }
+    }
+
+    /* Karta hráče */
+    .player-zone {
+      border-radius: 16px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 0;
+      max-height: 150px;
+      overflow: hidden;
+      transition: background-color 0.14s ease;
+    }
+
+    .player-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      min-height: 30px;
+    }
+
+    .player-identity {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .meeple-dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+      cursor: pointer;
+    }
+
+    .player-name-btn {
+      font-size: clamp(1.05rem, 3vw, 1.35rem);
+      font-weight: 800;
+      background: transparent;
+      padding: 2px 4px;
+      text-align: left;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+      min-width: 0;
+      cursor: pointer;
+    }
+
+    .remove-player-btn {
+      background: rgba(0, 0, 0, 0.25);
+      color: rgba(255, 255, 255, 0.8);
+      padding: 3px 8px;
+      font-size: 0.85rem;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+
+    /* Skóre přímo na ploše */
+    .scores-row {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+    }
+
+    .scores-row.dual {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .score-hit {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 12px;
+      cursor: pointer;
+      min-height: 0;
+      transition: background-color 0.12s ease, transform 0.06s ease;
+    }
+
+    .score-hit:active {
+      transform: scale(0.97);
+    }
+
+    .score-num {
+      font-size: clamp(2.5rem, 100vw, 5.2rem);
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+    }
+
+    main[data-count="5"] .score-num,
+    main[data-count="6"] .score-num {
+      font-size: clamp(2.1rem, 7.5vw, 3.8rem);
+    }
+
+    .scores-row.dual .score-num {
+      font-size: clamp(1.85rem, 6.2vw, 3.6rem);
+    }
+
+    main[data-count="5"] .scores-row.dual .score-num,
+    main[data-count="6"] .scores-row.dual .score-num {
+      font-size: clamp(1.55rem, 5vw, 2.7rem);
+    }
+
+    /* Spodní ovládací panel */
+    footer {
+      background: var(--surface);
+      padding: 10px 10px 14px;
+      flex-shrink: 0;
+    }
+
+    .pad-box {
+      width: 100%;
+      max-width: 820px;
+      margin: 0 auto;
+    }
+
+    .chips-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .chips-grid.hidden {
+      display: none;
+    }
+
+    .big-btn {
+      height: 100px;
+      font-size: 1.75rem;
+      font-weight: 900;
+      border-radius: 13px;
+      font-variant-numeric: tabular-nums;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+
+    @media (min-width: 640px) {
+      .big-btn {
+        height: 64px;
+        font-size: 1.9rem;
+      }
+    }
+
+    .sign-btn {
+      font-size: 2.1rem;
+      background: var(--pos-bg);
+      color: var(--pos-fg);
+    }
+
+    .sign-btn.minus {
+      background: var(--neg-bg);
+      color: var(--neg-fg);
+    }
+
+    .chip-btn {
+      background: var(--btn-bg);
+      color: #f8fafc;
+    }
+
+    .chip-btn.hi {
+      background: var(--btn-hi);
+      color: #93c5fd;
+    }
+
+    .chip-btn.minus {
+      background: var(--btn-bg-neg);
+      color: #fca5a5;
+    }
+
+    .numpad-open-btn {
+      background: #403792;
+      color: #c7d2fe;
+      font-size: 1.45rem;
+    }
+
+    /* Numerická klávesnice */
+    .numpad-wrap {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .numpad-wrap.open {
+      display: flex;
+    }
+
+    .numpad-top {
+      display: grid;
+      grid-template-columns: 76px 1fr 108px;
+      gap: 8px;
+    }
+
+    .numpad-val {
+      height: 100px;
+      background: var(--bg);
+      border-radius: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 0 16px;
+      font-size: 2.1rem;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .numpad-keys {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .ok-btn {
+      background: #10b981;
+      color: #042814;
+      font-size: 1.5rem;
+    }
+
+    .ok-btn.minus {
+      background: #ef4444;
+      color: #ffffff;
+    }
+
+    /* Modal pro přejmenování na přidržení */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.78);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 50;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-card {
+      background: var(--surface);
+      border-radius: 16px;
+      padding: 18px;
+      width: 100%;
+      max-width: 380px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .modal-input {
+      width: 100%;
+      font-size: 1.25rem;
+      font-weight: 800;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: none;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .modal-input:focus {
+      outline: 2px solid #3b82f6;
+    }
+
+    .quick-names {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .quick-name-chip {
+      padding: 8px 13px;
+      font-size: 0.95rem;
+      border-radius: 999px;
+      background: var(--btn-bg);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="bar-group">
+      <button id="dualBtn" type="button">2× skóre</button>
+      <button id="addPlayerBtn" type="button">+ Hráč</button>
+      <button id="resetBtn" type="button">Reset</button>
+    </div>
+    <div class="bar-group">
+      <span class="last-delta" id="lastDelta"></span>
+      <button id="undoBtn" type="button" disabled title="Klepnutí: Zpět | Přidržení: Znovu (Redo)">Zpět</button>
+    </div>
+  </header>
+
+  <main id="board" data-count="2"></main>
+
+  <footer>
+    <div class="pad-box">
+      <div class="chips-grid" id="chipsGrid">
+        <button type="button" class="big-btn sign-btn" id="signBtn">+</button>
+        <button type="button" class="big-btn chip-btn" data-val="1">+1</button>
+        <button type="button" class="big-btn chip-btn" data-val="2">+2</button>
+        <button type="button" class="big-btn chip-btn" data-val="3">+3</button>
+
+        <button type="button" class="big-btn chip-btn" data-val="4">+4</button>
+        <button type="button" class="big-btn chip-btn" data-val="5">+5</button>
+        <button type="button" class="big-btn chip-btn" data-val="6">+6</button>
+        <button type="button" class="big-btn chip-btn" data-val="7">+7</button>
+
+        <button type="button" class="big-btn chip-btn" data-val="8">+8</button>
+        <button type="button" class="big-btn chip-btn" data-val="9">+9</button>
+        <button type="button" class="big-btn chip-btn" data-val="10">+10</button>
+        <button type="button" class="big-btn numpad-open-btn" id="openNumpadBtn">123</button>
+      </div>
+
+      <div class="numpad-wrap" id="numpadWrap">
+        <div class="numpad-top">
+          <button type="button" class="big-btn sign-btn" id="numSignBtn">+</button>
+          <div class="numpad-val" id="numDisplay">0</div>
+          <button type="button" class="big-btn ok-btn" id="numOkBtn">OK</button>
+        </div>
+        <div class="numpad-keys">
+          <button type="button" class="big-btn" data-d="1">1</button>
+          <button type="button" class="big-btn" data-d="2">2</button>
+          <button type="button" class="big-btn" data-d="3">3</button>
+          <button type="button" class="big-btn" id="numBackBtn">⌫</button>
+          <button type="button" class="big-btn" data-d="4">4</button>
+          <button type="button" class="big-btn" data-d="5">5</button>
+          <button type="button" class="big-btn" data-d="6">6</button>
+          <button type="button" class="big-btn" data-d="0">0</button>
+          <button type="button" class="big-btn" data-d="7">7</button>
+          <button type="button" class="big-btn" data-d="8">8</button>
+          <button type="button" class="big-btn" data-d="9">9</button>
+          <button type="button" class="big-btn numpad-open-btn" id="closeNumpadBtn">Body</button>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <div class="modal-backdrop" id="renameModal">
+    <div class="modal-card">
+      <input type="text" class="modal-input" id="renameInput" maxlength="20" />
+      <div class="quick-names">
+        <button type="button" class="quick-name-chip">Honza</button>
+        <button type="button" class="quick-name-chip">Marcela</button>
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="cancelRenameBtn">Zrušit</button>
+        <button type="button" class="toggle-on" id="saveRenameBtn">Uložit</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'carcassonne_counter_v1';
+
+    const MEEPLES = [
+      { hex: '#ef4444', soft: '#2a1519', active: '#4c1d24', slotActive: 'rgba(255, 255, 255, 0.12)' },
+      { hex: '#3b82f6', soft: '#142138', active: '#1e3661', slotActive: 'rgba(255, 255, 255, 0.12)' },
+      { hex: '#10b981', soft: '#112922', active: '#174538', slotActive: 'rgba(255, 255, 255, 0.12)' },
+      { hex: '#eab308', soft: '#2b2412', active: '#4a3d18', slotActive: 'rgba(255, 255, 255, 0.12)' },
+      { hex: '#cbd5e1', soft: '#1f242d', active: '#333c4b', slotActive: 'rgba(255, 255, 255, 0.12)' },
+      { hex: '#ec4899', soft: '#2b1524', active: '#4d1d3e', slotActive: 'rgba(255, 255, 255, 0.12)' }
+    ];
+
+    const CHIPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const LONG_PRESS_MS = 480;
+    const MAX_HISTORY = 60;
+
+    let state = {
+      dualMode: false,
+      sign: 1,
+      numpadOpen: false,
+      numBuf: '',
+      selectedPlayerId: 1,
+      selectedScoreIdx: 0,
+      players: [
+        { id: 1, name: 'Jana', colorIdx: 1, scores: [0, 0] },
+        { id: 2, name: 'Honza', colorIdx: 3, scores: [0, 0] }
+      ],
+      lastActionLabel: '',
+      lastActionColor: ''
+    };
+
+    let undoStack = [];
+    let redoStack = [];
+    let renamingPlayerId = null;
+
+    function createSnapshot() {
+      return {
+        dualMode: state.dualMode,
+        selectedPlayerId: state.selectedPlayerId,
+        selectedScoreIdx: state.selectedScoreIdx,
+        players: state.players.map(p => ({ ...p, scores: [...p.scores] })),
+        lastActionLabel: state.lastActionLabel,
+        lastActionColor: state.lastActionColor
+      };
+    }
+
+    function applySnapshot(snap) {
+      state.dualMode = snap.dualMode;
+      state.selectedPlayerId = snap.selectedPlayerId;
+      state.selectedScoreIdx = snap.selectedScoreIdx;
+      state.players = snap.players.map(p => ({ ...p, scores: [...p.scores] }));
+      state.lastActionLabel = snap.lastActionLabel;
+      state.lastActionColor = snap.lastActionColor;
+    }
+
+    function saveToStorage() {
+      try {
+        const payload = {
+          state,
+          undoStack,
+          redoStack
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      } catch (e) {
+        // Ignorujeme chybu v anonymním režimu nebo při plném úložišti
+      }
+    }
+
+    function loadFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.state && Array.isArray(parsed.state.players) && parsed.state.players.length >= 2) {
+          state = {
+            ...state,
+            ...parsed.state,
+            numpadOpen: false,
+            numBuf: ''
+          };
+          undoStack = Array.isArray(parsed.undoStack) ? parsed.undoStack : [];
+          redoStack = Array.isArray(parsed.redoStack) ? parsed.redoStack : [];
+        }
+      } catch (e) {
+        // Poškozená data v úložišti ignorujeme a použijeme výchozí stav
+      }
+    }
+
+    function pushSnapshot(label = '', color = '') {
+      undoStack.push(createSnapshot());
+      if (undoStack.length > MAX_HISTORY) undoStack.shift();
+      // Nová akce zneplatní větev Redo
+      redoStack = [];
+      state.lastActionLabel = label;
+      state.lastActionColor = color;
+    }
+
+    function performUndo() {
+      if (undoStack.length === 0) return;
+      redoStack.push(createSnapshot());
+      if (redoStack.length > MAX_HISTORY) redoStack.shift();
+      const prev = undoStack.pop();
+      applySnapshot(prev);
+      render();
+    }
+
+    function performRedo() {
+      if (redoStack.length === 0) return;
+      undoStack.push(createSnapshot());
+      if (undoStack.length > MAX_HISTORY) undoStack.shift();
+      const next = redoStack.pop();
+      applySnapshot(next);
+      render();
+    }
+
+    const board = document.getElementById('board');
+    const dualBtn = document.getElementById('dualBtn');
+    const addPlayerBtn = document.getElementById('addPlayerBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const undoBtn = document.getElementById('undoBtn');
+    const lastDelta = document.getElementById('lastDelta');
+
+    const chipsGrid = document.getElementById('chipsGrid');
+    const signBtn = document.getElementById('signBtn');
+    const chipBtns = document.querySelectorAll('.chip-btn');
+    const openNumpadBtn = document.getElementById('openNumpadBtn');
+
+    const numpadWrap = document.getElementById('numpadWrap');
+    const numSignBtn = document.getElementById('numSignBtn');
+    const numDisplay = document.getElementById('numDisplay');
+    const numOkBtn = document.getElementById('numOkBtn');
+    const numBackBtn = document.getElementById('numBackBtn');
+    const closeNumpadBtn = document.getElementById('closeNumpadBtn');
+
+    const renameModal = document.getElementById('renameModal');
+    const renameInput = document.getElementById('renameInput');
+    const cancelRenameBtn = document.getElementById('cancelRenameBtn');
+    const saveRenameBtn = document.getElementById('saveRenameBtn');
+
+    function bindPress(el, onShortTap, onLongPress) {
+      let timer = null;
+      let longTriggered = false;
+
+      const clear = () => {
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+      };
+
+      el.addEventListener('pointerdown', (e) => {
+        if (el.disabled) return;
+        e.stopPropagation();
+        longTriggered = false;
+        clear();
+        timer = setTimeout(() => {
+          longTriggered = true;
+          if (navigator.vibrate) navigator.vibrate(25);
+          onLongPress();
+        }, LONG_PRESS_MS);
+      });
+
+      el.addEventListener('pointerup', (e) => {
+        if (el.disabled) return;
+        e.stopPropagation();
+        clear();
+        if (!longTriggered && onShortTap) {
+          onShortTap();
+        }
+      });
+
+      el.addEventListener('pointercancel', clear);
+      el.addEventListener('pointerleave', clear);
+      el.addEventListener('contextmenu', (e) => e.preventDefault());
+    }
+
+    // Tlačítko Zpět: klepnutí = Undo, přidržení = Redo
+    bindPress(
+      undoBtn,
+      () => performUndo(),
+      () => performRedo()
+    );
+
+    function render() {
+      board.dataset.count = state.players.length;
+      dualBtn.classList.toggle('toggle-on', state.dualMode);
+      addPlayerBtn.disabled = state.players.length >= 6;
+      board.innerHTML = '';
+
+      state.players.forEach(player => {
+        const isSelected = player.id === state.selectedPlayerId;
+        const m = MEEPLES[player.colorIdx];
+
+        const zone = document.createElement('div');
+        zone.className = 'player-zone';
+        zone.style.backgroundColor = isSelected ? m.active : m.soft;
+
+        const top = document.createElement('div');
+        top.className = 'player-top';
+
+        const identity = document.createElement('div');
+        identity.className = 'player-identity';
+
+        const dot = document.createElement('div');
+        dot.className = 'meeple-dot';
+        dot.style.backgroundColor = m.hex;
+        bindPress(
+          dot,
+          () => {
+            state.selectedPlayerId = player.id;
+            render();
+          },
+          () => {
+            pushSnapshot();
+            state.selectedPlayerId = player.id;
+            player.colorIdx = (player.colorIdx + 1) % MEEPLES.length;
+            render();
+          }
+        );
+
+        const nameBtn = document.createElement('button');
+        nameBtn.type = 'button';
+        nameBtn.className = 'player-name-btn';
+        nameBtn.textContent = player.name;
+        nameBtn.style.color = isSelected ? '#ffffff' : m.hex;
+        bindPress(
+          nameBtn,
+          () => {
+            state.selectedPlayerId = player.id;
+            render();
+          },
+          () => {
+            state.selectedPlayerId = player.id;
+            openRenameModal(player);
+          }
+        );
+
+        identity.appendChild(dot);
+        identity.appendChild(nameBtn);
+        top.appendChild(identity);
+
+        if (state.players.length > 2) {
+          const delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.className = 'remove-player-btn';
+          delBtn.textContent = '✕';
+          delBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            pushSnapshot(`− ${player.name}`, m.hex);
+            state.players = state.players.filter(p => p.id !== player.id);
+            if (state.selectedPlayerId === player.id) {
+              state.selectedPlayerId = state.players[0].id;
+            }
+            render();
+          });
+          top.appendChild(delBtn);
+        }
+
+        zone.appendChild(top);
+
+        const scoresRow = document.createElement('div');
+        scoresRow.className = 'scores-row' + (state.dualMode ? ' dual' : '');
+
+        const count = state.dualMode ? 2 : 1;
+        for (let i = 0; i < count; i++) {
+          const isSlotSelected = isSelected && state.selectedScoreIdx === i;
+          const hit = document.createElement('div');
+          hit.className = 'score-hit';
+
+          if (state.dualMode && isSlotSelected) {
+            hit.style.backgroundColor = m.slotActive;
+          }
+
+          const num = document.createElement('div');
+          num.className = 'score-num';
+          num.textContent = player.scores[i];
+          num.style.color = isSlotSelected ? '#ffffff' : m.hex;
+
+          hit.appendChild(num);
+          hit.addEventListener('click', () => {
+            state.selectedPlayerId = player.id;
+            state.selectedScoreIdx = i;
+            render();
+          });
+
+          scoresRow.appendChild(hit);
+        }
+
+        zone.appendChild(scoresRow);
+        board.appendChild(zone);
+      });
+
+      const isMinus = state.sign === -1;
+      signBtn.textContent = isMinus ? '−' : '+';
+      signBtn.classList.toggle('minus', isMinus);
+      numSignBtn.textContent = isMinus ? '−' : '+';
+      numSignBtn.classList.toggle('minus', isMinus);
+      numOkBtn.classList.toggle('minus', isMinus);
+
+      chipBtns.forEach((btn, i) => {
+        const val = CHIPS[i];
+        btn.textContent = (isMinus ? '−' : '+') + val;
+        btn.classList.toggle('minus', isMinus);
+      });
+
+      chipsGrid.classList.toggle('hidden', state.numpadOpen);
+      numpadWrap.classList.toggle('open', state.numpadOpen);
+      numDisplay.textContent = (isMinus ? '−' : '+') + (state.numBuf || '0');
+
+      const canUndo = undoStack.length > 0;
+      const canRedo = redoStack.length > 0;
+      undoBtn.disabled = !canUndo && !canRedo;
+      undoBtn.classList.toggle('has-redo', canRedo);
+      undoBtn.textContent = canRedo ? 'Zpět ↻' : 'Zpět';
+
+      lastDelta.textContent = state.lastActionLabel;
+      lastDelta.style.color = state.lastActionColor || 'var(--text-muted)';
+
+      saveToStorage();
+    }
+
+    function openRenameModal(player) {
+      renamingPlayerId = player.id;
+      renameInput.value = player.name;
+      renameModal.classList.add('open');
+      setTimeout(() => {
+        renameInput.focus();
+        renameInput.select();
+      }, 50);
+    }
+
+    function closeRenameModal() {
+      renameModal.classList.remove('open');
+      renamingPlayerId = null;
+    }
+
+    document.querySelectorAll('.quick-name-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        renameInput.value = chip.textContent;
+        renameInput.focus();
+      });
+    });
+
+    cancelRenameBtn.addEventListener('click', closeRenameModal);
+
+    saveRenameBtn.addEventListener('click', () => {
+      const player = state.players.find(p => p.id === renamingPlayerId);
+      if (player) {
+        const clean = renameInput.value.trim();
+        if (clean && clean !== player.name) {
+          pushSnapshot();
+          player.name = clean;
+        }
+      }
+      closeRenameModal();
+      render();
+    });
+
+    renameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') saveRenameBtn.click();
+      if (e.key === 'Escape') closeRenameModal();
+    });
+
+    function applyDelta(amount) {
+      if (!amount || amount <= 0) return;
+      const player = state.players.find(p => p.id === state.selectedPlayerId);
+      if (!player) return;
+
+      const idx = state.dualMode ? state.selectedScoreIdx : 0;
+      const delta = amount * state.sign;
+      const signStr = delta >= 0 ? `+${delta}` : `${delta}`;
+
+      pushSnapshot(`${player.name} ${signStr}`, MEEPLES[player.colorIdx].hex);
+      player.scores[idx] += delta;
+
+      render();
+    }
+
+    chipBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        applyDelta(parseInt(btn.dataset.val, 10));
+      });
+    });
+
+    function toggleSign() {
+      state.sign *= -1;
+      render();
+    }
+
+    signBtn.addEventListener('click', toggleSign);
+    numSignBtn.addEventListener('click', toggleSign);
+
+    openNumpadBtn.addEventListener('click', () => {
+      state.numpadOpen = true;
+      state.numBuf = '';
+      render();
+    });
+
+    closeNumpadBtn.addEventListener('click', () => {
+      state.numpadOpen = false;
+      state.numBuf = '';
+      render();
+    });
+
+    document.querySelectorAll('[data-d]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (state.numBuf.length >= 3) return;
+        if (state.numBuf === '0') state.numBuf = '';
+        state.numBuf += btn.dataset.d;
+        render();
+      });
+    });
+
+    numBackBtn.addEventListener('click', () => {
+      state.numBuf = state.numBuf.slice(0, -1);
+      render();
+    });
+
+    numOkBtn.addEventListener('click', () => {
+      const val = parseInt(state.numBuf, 10);
+      if (val > 0) applyDelta(val);
+      state.numBuf = '';
+      state.numpadOpen = false;
+      render();
+    });
+
+    dualBtn.addEventListener('click', () => {
+      if (state.dualMode) {
+        pushSnapshot('Součet 2× skóre', '#60a5fa');
+        state.players.forEach(p => {
+          p.scores = [p.scores[0] + p.scores[1], 0];
+        });
+        state.dualMode = false;
+        state.selectedScoreIdx = 0;
+      } else {
+        pushSnapshot('2× skóre', '#60a5fa');
+        state.dualMode = true;
+      }
+      render();
+    });
+
+    addPlayerBtn.addEventListener('click', () => {
+      if (state.players.length >= 6) return;
+      const nextId = state.players.length > 0 ? Math.max(...state.players.map(p => p.id)) + 1 : 1;
+      const used = state.players.map(p => p.colorIdx);
+      let free = MEEPLES.findIndex((_, i) => !used.includes(i));
+      if (free === -1) free = (nextId - 1) % MEEPLES.length;
+
+      pushSnapshot(`+ Hráč ${nextId}`, MEEPLES[free].hex);
+      state.players.push({
+        id: nextId,
+        name: `Hráč ${nextId}`,
+        colorIdx: free,
+        scores: [0, 0]
+      });
+      state.selectedPlayerId = nextId;
+      render();
+    });
+
+    resetBtn.addEventListener('click', () => {
+      if (!confirm('Vynulovat skóre?')) return;
+      pushSnapshot('Reset', '#94a3b8');
+      state.players.forEach(p => p.scores = [0, 0]);
+      state.sign = 1;
+      state.numBuf = '';
+      render();
+    });
+
+    // Načtení uložené partie při spuštění
+    loadFromStorage();
+    render();
+  </script>
+</body>
+</html>
