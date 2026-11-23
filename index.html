@@ -14,6 +14,7 @@
       --surface: #12161f;
       --btn-bg: #262c3a;
       --btn-bg-neg: #6e2226;
+      --btn-hi: #232d42;
       --text: #f8fafc;
       --text-muted: #94a3b8;
       --pos-bg: #0d3d2e;
@@ -81,8 +82,8 @@
       background: var(--btn-bg);
       border: none;
       border-radius: 10px;
-      padding: 8px 10px;
-      font-size: 0.88rem;
+      padding: 9px 12px;
+      font-size: 0.92rem;
       cursor: pointer;
       touch-action: manipulation;
       transition: transform 0.05s ease, background-color 0.12s ease;
@@ -271,7 +272,7 @@
     }
 
     .score-num {
-      font-size: clamp(2.6rem, 10vw, 5.2rem);
+      font-size: clamp(2.6rem, 100vw, 5.2rem);
       font-weight: 900;
       line-height: 1;
       letter-spacing: -0.03em;
@@ -317,7 +318,7 @@
     }
 
     .big-btn {
-      height: 82px;
+      height: 100px;
       font-size: 1.85rem;
       font-weight: 900;
       border-radius: 13px;
@@ -351,6 +352,10 @@
       color: #f8fafc;
     }
 
+    .chip-btn.hi {
+      background: var(--btn-hi);
+      color: #93c5fd;
+    }
     .chip-btn.minus {
       background: var(--btn-bg-neg);
       color: #fecaca;
@@ -380,7 +385,7 @@
     }
 
     .numpad-val {
-      height: 82px;
+      height: 100px;
       background: var(--bg);
       border-radius: 13px;
       display: flex;
