@@ -3,20 +3,23 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0b0d11" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Carcassonne Počítadlo</title>
+  <link id="pwa-manifest" rel="manifest" />
   <style>
     :root {
-      --bg: #0b0d11;
-      --surface: #141820;
-      --btn-bg: #3e4045;
-      --btn-bg-neg: #893e3e;
-      --btn-hi: #232d42;
+      --bg: #080a0d;
+      --surface: #12161f;
+      --btn-bg: #262c3a;
+      --btn-bg-neg: #6e2226;
       --text: #f8fafc;
       --text-muted: #94a3b8;
-      --pos-bg: #12382b;
-      --pos-fg: #34d399;
-      --neg-bg: #451a1a;
-      --neg-fg: #f87171;
+      --pos-bg: #0d3d2e;
+      --pos-fg: #10b981;
+      --neg-bg: #4c1418;
+      --neg-fg: #ff4d5a;
     }
 
     * {
@@ -24,26 +27,42 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    body {
+    html, body {
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      display: flex;
-      flex-direction: column;
+      padding: 0;
+      width: 100%;
       height: 100dvh;
       overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
       user-select: none;
       -webkit-user-select: none;
     }
 
-    /* Horní lišta - bez linek, jen čisté plochy */
+    /* Hlavní kontejner umožňující plynulé otočení o 180° pro 2 hráče */
+    #app {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      background: var(--bg);
+      transform-origin: center center;
+      transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    #app.flipped {
+      transform: rotate(180deg);
+    }
+
+    /* Horní lišta */
     header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 6px;
-      padding: 8px 10px;
+      gap: 4px;
+      padding: 7px 8px;
       background: var(--surface);
       flex-shrink: 0;
     }
@@ -51,7 +70,7 @@
     .bar-group {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       min-width: 0;
     }
 
@@ -62,15 +81,15 @@
       background: var(--btn-bg);
       border: none;
       border-radius: 10px;
-      padding: 9px 12px;
-      font-size: 0.92rem;
+      padding: 8px 10px;
+      font-size: 0.88rem;
       cursor: pointer;
       touch-action: manipulation;
       transition: transform 0.05s ease, background-color 0.12s ease;
     }
 
     button:active {
-      transform: scale(0.96);
+      transform: scale(0.95);
     }
 
     button:disabled {
@@ -83,19 +102,30 @@
       color: #ffffff;
     }
 
+    button.wake-on {
+      background: #b45309;
+      color: #fef3c7;
+    }
+
     button.has-redo {
       background: #334155;
       color: #93c5fd;
     }
 
+    .icon-btn {
+      padding: 8px 9px;
+      font-size: 0.95rem;
+      line-height: 1;
+    }
+
     .last-delta {
-      font-size: 0.88rem;
-      font-weight: 800;
+      font-size: 0.84rem;
+      font-weight: 900;
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 135px;
+      max-width: 105px;
     }
 
     /* Plocha hráčů */
@@ -105,6 +135,7 @@
       gap: 8px;
       padding: 8px 10px;
       min-height: 0;
+      position: relative;
     }
 
     main[data-count="2"] {
@@ -136,7 +167,7 @@
       }
     }
 
-    /* Karta hráče */
+    /* Karta hráče - bez rámečků, odlišená sytou výplní */
     .player-zone {
       border-radius: 16px;
       padding: 10px 12px;
@@ -144,9 +175,19 @@
       flex-direction: column;
       justify-content: space-between;
       min-height: 0;
-      max-height: 150px;
+      max-height: 155px;
       overflow: hidden;
-      transition: background-color 0.14s ease;
+      transition: background-color 0.14s ease, transform 0.12s ease, opacity 0.12s ease;
+    }
+
+    .player-zone.dragging-source {
+      opacity: 0.45;
+      transform: scale(0.95);
+    }
+
+    .player-zone.drag-over-target {
+      transform: scale(1.03);
+      filter: brightness(1.25);
     }
 
     .player-top {
@@ -166,17 +207,17 @@
     }
 
     .meeple-dot {
-      width: 22px;
-      height: 22px;
+      width: 24px;
+      height: 24px;
       border-radius: 50%;
       flex-shrink: 0;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
       cursor: pointer;
     }
 
     .player-name-btn {
       font-size: clamp(1.05rem, 3vw, 1.35rem);
-      font-weight: 800;
+      font-weight: 900;
       background: transparent;
       padding: 2px 4px;
       text-align: left;
@@ -189,8 +230,8 @@
     }
 
     .remove-player-btn {
-      background: rgba(0, 0, 0, 0.25);
-      color: rgba(255, 255, 255, 0.8);
+      background: rgba(0, 0, 0, 0.32);
+      color: rgba(255, 255, 255, 0.85);
       padding: 3px 8px;
       font-size: 0.85rem;
       border-radius: 8px;
@@ -221,6 +262,7 @@
       border-radius: 12px;
       cursor: pointer;
       min-height: 0;
+      touch-action: none;
       transition: background-color 0.12s ease, transform 0.06s ease;
     }
 
@@ -229,12 +271,12 @@
     }
 
     .score-num {
-      font-size: clamp(2.5rem, 100vw, 5.2rem);
+      font-size: clamp(2.6rem, 10vw, 5.2rem);
       font-weight: 900;
       line-height: 1;
       letter-spacing: -0.03em;
       font-variant-numeric: tabular-nums;
-      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+      text-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
     }
 
     main[data-count="5"] .score-num,
@@ -243,7 +285,7 @@
     }
 
     .scores-row.dual .score-num {
-      font-size: clamp(1.85rem, 6.2vw, 3.6rem);
+      font-size: clamp(1.9rem, 6.2vw, 3.6rem);
     }
 
     main[data-count="5"] .scores-row.dual .score-num,
@@ -275,8 +317,8 @@
     }
 
     .big-btn {
-      height: 100px;
-      font-size: 1.75rem;
+      height: 82px;
+      font-size: 1.85rem;
       font-weight: 900;
       border-radius: 13px;
       font-variant-numeric: tabular-nums;
@@ -288,13 +330,13 @@
 
     @media (min-width: 640px) {
       .big-btn {
-        height: 64px;
+        height: 66px;
         font-size: 1.9rem;
       }
     }
 
     .sign-btn {
-      font-size: 2.1rem;
+      font-size: 2.2rem;
       background: var(--pos-bg);
       color: var(--pos-fg);
     }
@@ -309,19 +351,14 @@
       color: #f8fafc;
     }
 
-    .chip-btn.hi {
-      background: var(--btn-hi);
-      color: #93c5fd;
-    }
-
     .chip-btn.minus {
       background: var(--btn-bg-neg);
-      color: #fca5a5;
+      color: #fecaca;
     }
 
     .numpad-open-btn {
-      background: #403792;
-      color: #c7d2fe;
+      background: #4338ca;
+      color: #e0e7ff;
       font-size: 1.45rem;
     }
 
@@ -343,16 +380,22 @@
     }
 
     .numpad-val {
-      height: 100px;
+      height: 82px;
       background: var(--bg);
       border-radius: 13px;
       display: flex;
       align-items: center;
       justify-content: flex-end;
       padding: 0 16px;
-      font-size: 2.1rem;
+      font-size: 2.2rem;
       font-weight: 900;
       font-variant-numeric: tabular-nums;
+    }
+
+    @media (min-width: 640px) {
+      .numpad-val {
+        height: 66px;
+      }
     }
 
     .numpad-keys {
@@ -363,8 +406,8 @@
 
     .ok-btn {
       background: #10b981;
-      color: #042814;
-      font-size: 1.5rem;
+      color: #032212;
+      font-size: 1.55rem;
     }
 
     .ok-btn.minus {
@@ -372,11 +415,26 @@
       color: #ffffff;
     }
 
-    /* Modal pro přejmenování na přidržení */
+    /* Plovoucí štítek při tažení karty hráče */
+    .drag-ghost {
+      position: fixed;
+      pointer-events: none;
+      z-index: 100;
+      padding: 10px 18px;
+      border-radius: 14px;
+      font-weight: 900;
+      font-size: 1.2rem;
+      color: #ffffff;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65);
+      transform: translate(-50%, -50%);
+      display: none;
+    }
+
+    /* Modal pro přejmenování */
     .modal-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.78);
+      background: rgba(0, 0, 0, 0.8);
       display: none;
       align-items: center;
       justify-content: center;
@@ -436,69 +494,79 @@
 </head>
 <body>
 
-  <header>
-    <div class="bar-group">
-      <button id="dualBtn" type="button">2× skóre</button>
-      <button id="addPlayerBtn" type="button">+ Hráč</button>
-      <button id="resetBtn" type="button">Reset</button>
-    </div>
-    <div class="bar-group">
-      <span class="last-delta" id="lastDelta"></span>
-      <button id="undoBtn" type="button" disabled title="Klepnutí: Zpět | Přidržení: Znovu (Redo)">Zpět</button>
-    </div>
-  </header>
-
-  <main id="board" data-count="2"></main>
-
-  <footer>
-    <div class="pad-box">
-      <div class="chips-grid" id="chipsGrid">
-        <button type="button" class="big-btn sign-btn" id="signBtn">+</button>
-        <button type="button" class="big-btn chip-btn" data-val="1">+1</button>
-        <button type="button" class="big-btn chip-btn" data-val="2">+2</button>
-        <button type="button" class="big-btn chip-btn" data-val="3">+3</button>
-
-        <button type="button" class="big-btn chip-btn" data-val="4">+4</button>
-        <button type="button" class="big-btn chip-btn" data-val="5">+5</button>
-        <button type="button" class="big-btn chip-btn" data-val="6">+6</button>
-        <button type="button" class="big-btn chip-btn" data-val="7">+7</button>
-
-        <button type="button" class="big-btn chip-btn" data-val="8">+8</button>
-        <button type="button" class="big-btn chip-btn" data-val="9">+9</button>
-        <button type="button" class="big-btn chip-btn" data-val="10">+10</button>
-        <button type="button" class="big-btn numpad-open-btn" id="openNumpadBtn">123</button>
+  <div id="app">
+    <header>
+      <div class="bar-group">
+        <button id="dualBtn" type="button">2× skóre</button>
+        <button id="addPlayerBtn" type="button">+ Hráč</button>
+        <button id="resetBtn" type="button">Reset</button>
       </div>
+      <div class="bar-group">
+        <span class="last-delta" id="lastDelta"></span>
+        <button id="undoBtn" type="button" disabled title="Klepnutí: Zpět | Přidržení: Redo">Zpět</button>
+        <button id="wakeBtn" type="button" class="icon-btn wake-on" title="Zámek displeje (nezhasínat)">☀</button>
+        <button id="fsBtn" type="button" class="icon-btn" title="Celá obrazovka">⛶</button>
+      </div>
+    </header>
 
-      <div class="numpad-wrap" id="numpadWrap">
-        <div class="numpad-top">
-          <button type="button" class="big-btn sign-btn" id="numSignBtn">+</button>
-          <div class="numpad-val" id="numDisplay">0</div>
-          <button type="button" class="big-btn ok-btn" id="numOkBtn">OK</button>
+    <main id="board" data-count="2"></main>
+
+    <footer>
+      <div class="pad-box">
+        <div class="chips-grid" id="chipsGrid">
+          <button type="button" class="big-btn sign-btn" id="signBtn">+</button>
+          <button type="button" class="big-btn chip-btn" data-val="1">+1</button>
+          <button type="button" class="big-btn chip-btn" data-val="2">+2</button>
+          <button type="button" class="big-btn chip-btn" data-val="3">+3</button>
+
+          <button type="button" class="big-btn chip-btn" data-val="4">+4</button>
+          <button type="button" class="big-btn chip-btn" data-val="5">+5</button>
+          <button type="button" class="big-btn chip-btn" data-val="6">+6</button>
+          <button type="button" class="big-btn chip-btn" data-val="7">+7</button>
+
+          <button type="button" class="big-btn chip-btn" data-val="8">+8</button>
+          <button type="button" class="big-btn chip-btn" data-val="9">+9</button>
+          <button type="button" class="big-btn chip-btn" data-val="10">+10</button>
+          <button type="button" class="big-btn numpad-open-btn" id="openNumpadBtn">123</button>
         </div>
-        <div class="numpad-keys">
-          <button type="button" class="big-btn" data-d="1">1</button>
-          <button type="button" class="big-btn" data-d="2">2</button>
-          <button type="button" class="big-btn" data-d="3">3</button>
-          <button type="button" class="big-btn" id="numBackBtn">⌫</button>
-          <button type="button" class="big-btn" data-d="4">4</button>
-          <button type="button" class="big-btn" data-d="5">5</button>
-          <button type="button" class="big-btn" data-d="6">6</button>
-          <button type="button" class="big-btn" data-d="0">0</button>
-          <button type="button" class="big-btn" data-d="7">7</button>
-          <button type="button" class="big-btn" data-d="8">8</button>
-          <button type="button" class="big-btn" data-d="9">9</button>
-          <button type="button" class="big-btn numpad-open-btn" id="closeNumpadBtn">Body</button>
+
+        <div class="numpad-wrap" id="numpadWrap">
+          <div class="numpad-top">
+            <button type="button" class="big-btn sign-btn" id="numSignBtn">+</button>
+            <div class="numpad-val" id="numDisplay">0</div>
+            <button type="button" class="big-btn ok-btn" id="numOkBtn">OK</button>
+          </div>
+          <div class="numpad-keys">
+            <button type="button" class="big-btn" data-d="1">1</button>
+            <button type="button" class="big-btn" data-d="2">2</button>
+            <button type="button" class="big-btn" data-d="3">3</button>
+            <button type="button" class="big-btn" id="numBackBtn">⌫</button>
+            <button type="button" class="big-btn" data-d="4">4</button>
+            <button type="button" class="big-btn" data-d="5">5</button>
+            <button type="button" class="big-btn" data-d="6">6</button>
+            <button type="button" class="big-btn" data-d="0">0</button>
+            <button type="button" class="big-btn" data-d="7">7</button>
+            <button type="button" class="big-btn" data-d="8">8</button>
+            <button type="button" class="big-btn" data-d="9">9</button>
+            <button type="button" class="big-btn numpad-open-btn" id="closeNumpadBtn">Body</button>
+          </div>
         </div>
       </div>
-    </div>
-  </footer>
+    </footer>
+  </div>
+
+  <div class="drag-ghost" id="dragGhost"></div>
 
   <div class="modal-backdrop" id="renameModal">
     <div class="modal-card">
       <input type="text" class="modal-input" id="renameInput" maxlength="20" />
       <div class="quick-names">
+        <button type="button" class="quick-name-chip">Jana</button>
         <button type="button" class="quick-name-chip">Honza</button>
-        <button type="button" class="quick-name-chip">Marcela</button>
+        <button type="button" class="quick-name-chip">Karel</button>
+        <button type="button" class="quick-name-chip">Tereza</button>
+        <button type="button" class="quick-name-chip">Petr</button>
+        <button type="button" class="quick-name-chip">Lucka</button>
       </div>
       <div class="modal-actions">
         <button type="button" id="cancelRenameBtn">Zrušit</button>
@@ -508,19 +576,60 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'carcassonne_counter_v1';
+    // --- PWA Manifest & Service Worker (inline pro jedno-souborové nasazení) ---
+    (function initPWA() {
+      const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="110" fill="#12161f"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="250" fill="#3b82f6">C</text></svg>`;
+      const iconUrl = 'data:image/svg+xml;base64,' + btoa(iconSvg);
+      const manifest = {
+        name: 'Carcassonne Počítadlo',
+        short_name: 'Počítadlo',
+        start_url: '.',
+        display: 'standalone',
+        background_color: '#080a0d',
+        theme_color: '#0b0d11',
+        icons: [
+          { src: iconUrl, sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable' },
+          { src: iconUrl, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
+        ]
+      };
+      const manifestEl = document.getElementById('pwa-manifest');
+      if (manifestEl) {
+        manifestEl.href = 'data:application/manifest+json;charset=utf-8,' + encodeURIComponent(JSON.stringify(manifest));
+      }
 
+      if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+        const swCode = `
+          const CACHE = 'carcassonne-pwa-v1';
+          self.addEventListener('install', e => {
+            e.waitUntil(caches.open(CACHE).then(c => c.addAll([self.location.href]).catch(() => {})));
+            self.skipWaiting();
+          });
+          self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+          self.addEventListener('fetch', e => {
+            e.respondWith(
+              caches.match(e.request).then(r => r || fetch(e.request).catch(() => caches.match(self.location.href)))
+            );
+          });
+        `;
+        const blob = new Blob([swCode], { type: 'application/javascript' });
+        navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
+      }
+    })();
+
+    const STORAGE_KEY = 'carcassonne_counter_v2';
+
+    // Syté, vysoce saturované barvy figurek
     const MEEPLES = [
-      { hex: '#ef4444', soft: '#2a1519', active: '#4c1d24', slotActive: 'rgba(255, 255, 255, 0.12)' },
-      { hex: '#3b82f6', soft: '#142138', active: '#1e3661', slotActive: 'rgba(255, 255, 255, 0.12)' },
-      { hex: '#10b981', soft: '#112922', active: '#174538', slotActive: 'rgba(255, 255, 255, 0.12)' },
-      { hex: '#eab308', soft: '#2b2412', active: '#4a3d18', slotActive: 'rgba(255, 255, 255, 0.12)' },
-      { hex: '#cbd5e1', soft: '#1f242d', active: '#333c4b', slotActive: 'rgba(255, 255, 255, 0.12)' },
-      { hex: '#ec4899', soft: '#2b1524', active: '#4d1d3e', slotActive: 'rgba(255, 255, 255, 0.12)' }
+      { hex: '#ff2a3c', soft: '#3d0e14', active: '#69121d', slotActive: 'rgba(0, 0, 0, 0.36)' }, // Sytá červená
+      { hex: '#1d84ff', soft: '#0d264d', active: '#133d7a', slotActive: 'rgba(0, 0, 0, 0.36)' }, // Elektrická modrá
+      { hex: '#00d67f', soft: '#093825', active: '#0d593a', slotActive: 'rgba(0, 0, 0, 0.36)' }, // Smaragdová zelená
+      { hex: '#ffc800', soft: '#423306', active: '#6b5208', slotActive: 'rgba(0, 0, 0, 0.36)' }, // Sytá žlutá
+      { hex: '#e8389b', soft: '#400e2b', active: '#6b1447', slotActive: 'rgba(0, 0, 0, 0.36)' }, // Sytá růžová/purpurová
+      { hex: '#b4bcc8', soft: '#232832', active: '#384152', slotActive: 'rgba(0, 0, 0, 0.36)' }  // Černá / kontrastní světle šedá
     ];
 
     const CHIPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-    const LONG_PRESS_MS = 480;
+    const LONG_PRESS_MS = 450;
     const MAX_HISTORY = 60;
 
     let state = {
@@ -542,6 +651,88 @@
     let redoStack = [];
     let renamingPlayerId = null;
 
+    // --- Haptika ---
+    function vibrate(pattern = 15) {
+      if (navigator.vibrate) {
+        try { navigator.vibrate(pattern); } catch (e) {}
+      }
+    }
+
+    // --- Wake Lock (Zámek displeje proti zhasnutí) ---
+    let wakeLock = null;
+    let wakeDesired = true;
+    const wakeBtn = document.getElementById('wakeBtn');
+
+    async function syncWakeLock() {
+      if (!('wakeLock' in navigator)) {
+        wakeBtn.style.display = 'none';
+        return;
+      }
+      if (wakeDesired) {
+        try {
+          if (!wakeLock) {
+            wakeLock = await navigator.wakeLock.request('screen');
+            wakeLock.addEventListener('release', () => {
+              wakeLock = null;
+              updateWakeBtn();
+            });
+          }
+        } catch (e) {
+          // Prohlížeč může vyžadovat interakci uživatele
+        }
+      } else if (wakeLock) {
+        try { await wakeLock.release(); } catch (e) {}
+        wakeLock = null;
+      }
+      updateWakeBtn();
+    }
+
+    function updateWakeBtn() {
+      wakeBtn.classList.toggle('wake-on', wakeDesired);
+      wakeBtn.style.opacity = wakeDesired ? '1' : '0.5';
+    }
+
+    wakeBtn.addEventListener('click', () => {
+      vibrate(15);
+      wakeDesired = !wakeDesired;
+      syncWakeLock();
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && wakeDesired) {
+        syncWakeLock();
+      }
+    });
+
+    // Aktivace Wake Locku při prvním dotyku na obrazovku (pokud ho prohlížeč při loadu blokoval)
+    document.addEventListener('pointerdown', () => {
+      if (wakeDesired && !wakeLock) syncWakeLock();
+    }, { passive: true });
+
+    // --- Fullscreen ---
+    const fsBtn = document.getElementById('fsBtn');
+    if (!document.fullscreenEnabled && !document.documentElement.webkitRequestFullscreen) {
+      fsBtn.style.display = 'none';
+    }
+
+    fsBtn.addEventListener('click', () => {
+      vibrate(15);
+      const isFs = document.fullscreenElement || document.webkitFullscreenElement;
+      if (!isFs) {
+        const el = document.documentElement;
+        if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      }
+    });
+
+    document.addEventListener('fullscreenchange', () => {
+      fsBtn.classList.toggle('toggle-on', !!document.fullscreenElement);
+    });
+
+    // --- Historie & LocalStorage ---
     function createSnapshot() {
       return {
         dualMode: state.dualMode,
@@ -564,15 +755,8 @@
 
     function saveToStorage() {
       try {
-        const payload = {
-          state,
-          undoStack,
-          redoStack
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-      } catch (e) {
-        // Ignorujeme chybu v anonymním režimu nebo při plném úložišti
-      }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ state, undoStack, redoStack }));
+      } catch (e) {}
     }
 
     function loadFromStorage() {
@@ -590,15 +774,12 @@
           undoStack = Array.isArray(parsed.undoStack) ? parsed.undoStack : [];
           redoStack = Array.isArray(parsed.redoStack) ? parsed.redoStack : [];
         }
-      } catch (e) {
-        // Poškozená data v úložišti ignorujeme a použijeme výchozí stav
-      }
+      } catch (e) {}
     }
 
     function pushSnapshot(label = '', color = '') {
       undoStack.push(createSnapshot());
       if (undoStack.length > MAX_HISTORY) undoStack.shift();
-      // Nová akce zneplatní větev Redo
       redoStack = [];
       state.lastActionLabel = label;
       state.lastActionColor = color;
@@ -606,22 +787,23 @@
 
     function performUndo() {
       if (undoStack.length === 0) return;
+      vibrate(20);
       redoStack.push(createSnapshot());
       if (redoStack.length > MAX_HISTORY) redoStack.shift();
-      const prev = undoStack.pop();
-      applySnapshot(prev);
+      applySnapshot(undoStack.pop());
       render();
     }
 
     function performRedo() {
       if (redoStack.length === 0) return;
+      vibrate([20, 40, 20]);
       undoStack.push(createSnapshot());
       if (undoStack.length > MAX_HISTORY) undoStack.shift();
-      const next = redoStack.pop();
-      applySnapshot(next);
+      applySnapshot(redoStack.pop());
       render();
     }
 
+    const appEl = document.getElementById('app');
     const board = document.getElementById('board');
     const dualBtn = document.getElementById('dualBtn');
     const addPlayerBtn = document.getElementById('addPlayerBtn');
@@ -645,7 +827,9 @@
     const renameInput = document.getElementById('renameInput');
     const cancelRenameBtn = document.getElementById('cancelRenameBtn');
     const saveRenameBtn = document.getElementById('saveRenameBtn');
+    const dragGhost = document.getElementById('dragGhost');
 
+    // Rozlišení krátkého stisku a dlouhého přidržení
     function bindPress(el, onShortTap, onLongPress) {
       let timer = null;
       let longTriggered = false;
@@ -664,7 +848,7 @@
         clear();
         timer = setTimeout(() => {
           longTriggered = true;
-          if (navigator.vibrate) navigator.vibrate(25);
+          vibrate(30);
           onLongPress();
         }, LONG_PRESS_MS);
       });
@@ -674,6 +858,7 @@
         e.stopPropagation();
         clear();
         if (!longTriggered && onShortTap) {
+          vibrate(12);
           onShortTap();
         }
       });
@@ -683,14 +868,110 @@
       el.addEventListener('contextmenu', (e) => e.preventDefault());
     }
 
-    // Tlačítko Zpět: klepnutí = Undo, přidržení = Redo
     bindPress(
       undoBtn,
       () => performUndo(),
       () => performRedo()
     );
 
+    // --- Přetahování hráčů (Drag & Drop na skóre) ---
+    function bindScoreInteraction(hitEl, player, scoreIdx, zoneEl, meeple) {
+      let holdTimer = null;
+      let isDragging = false;
+      let hoverTargetId = null;
+
+      const cleanup = () => {
+        if (holdTimer) {
+          clearTimeout(holdTimer);
+          holdTimer = null;
+        }
+        if (isDragging) {
+          isDragging = false;
+          zoneEl.classList.remove('dragging-source');
+          dragGhost.style.display = 'none';
+          document.querySelectorAll('.player-zone').forEach(z => z.classList.remove('drag-over-target'));
+        }
+      };
+
+      hitEl.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        isDragging = false;
+        hoverTargetId = null;
+
+        holdTimer = setTimeout(() => {
+          isDragging = true;
+          vibrate(35);
+          zoneEl.classList.add('dragging-source');
+          dragGhost.textContent = player.name;
+          dragGhost.style.backgroundColor = meeple.active;
+          dragGhost.style.color = '#ffffff';
+          dragGhost.style.left = e.clientX + 'px';
+          dragGhost.style.top = e.clientY + 'px';
+          dragGhost.style.display = 'block';
+          try { hitEl.setPointerCapture(e.pointerId); } catch (err) {}
+        }, 420);
+      });
+
+      hitEl.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+        dragGhost.style.left = e.clientX + 'px';
+        dragGhost.style.top = e.clientY + 'px';
+
+        // Zjistíme kartu pod prstem
+        dragGhost.style.display = 'none';
+        const elemBelow = document.elementFromPoint(e.clientX, e.clientY);
+        dragGhost.style.display = 'block';
+
+        const targetZone = elemBelow ? elemBelow.closest('.player-zone') : null;
+        document.querySelectorAll('.player-zone').forEach(z => z.classList.remove('drag-over-target'));
+
+        if (targetZone) {
+          const tid = parseInt(targetZone.dataset.playerId, 10);
+          if (tid && tid !== player.id) {
+            hoverTargetId = tid;
+            targetZone.classList.add('drag-over-target');
+          } else {
+            hoverTargetId = null;
+          }
+        } else {
+          hoverTargetId = null;
+        }
+      });
+
+      hitEl.addEventListener('pointerup', (e) => {
+        e.stopPropagation();
+        if (isDragging) {
+          const targetId = hoverTargetId;
+          cleanup();
+          if (targetId && targetId !== player.id) {
+            const fromIdx = state.players.findIndex(p => p.id === player.id);
+            const toIdx = state.players.findIndex(p => p.id === targetId);
+            if (fromIdx !== -1 && toIdx !== -1) {
+              pushSnapshot(`Pořadí: ${player.name}`, meeple.hex);
+              const [moved] = state.players.splice(fromIdx, 1);
+              state.players.splice(toIdx, 0, moved);
+              vibrate(25);
+              render();
+            }
+          }
+        } else {
+          cleanup();
+          vibrate(12);
+          state.selectedPlayerId = player.id;
+          state.selectedScoreIdx = scoreIdx;
+          render();
+        }
+      });
+
+      hitEl.addEventListener('pointercancel', cleanup);
+      hitEl.addEventListener('contextmenu', (e) => e.preventDefault());
+    }
+
     function render() {
+      // Překlopení o 180°, pokud jsou přesně 2 hráči a je aktivní druhý v pořadí
+      const shouldFlip = state.players.length === 2 && state.players[1].id === state.selectedPlayerId;
+      appEl.classList.toggle('flipped', shouldFlip);
+
       board.dataset.count = state.players.length;
       dualBtn.classList.toggle('toggle-on', state.dualMode);
       addPlayerBtn.disabled = state.players.length >= 6;
@@ -702,6 +983,7 @@
 
         const zone = document.createElement('div');
         zone.className = 'player-zone';
+        zone.dataset.playerId = player.id;
         zone.style.backgroundColor = isSelected ? m.active : m.soft;
 
         const top = document.createElement('div');
@@ -731,7 +1013,7 @@
         nameBtn.type = 'button';
         nameBtn.className = 'player-name-btn';
         nameBtn.textContent = player.name;
-        nameBtn.style.color = isSelected ? '#ffffff' : m.hex;
+        nameBtn.style.color = isSelected ? m.hex : '#f8fafc';
         bindPress(
           nameBtn,
           () => {
@@ -755,6 +1037,7 @@
           delBtn.textContent = '✕';
           delBtn.addEventListener('click', (e) => {
             e.stopPropagation();
+            vibrate(20);
             pushSnapshot(`− ${player.name}`, m.hex);
             state.players = state.players.filter(p => p.id !== player.id);
             if (state.selectedPlayerId === player.id) {
@@ -783,14 +1066,11 @@
           const num = document.createElement('div');
           num.className = 'score-num';
           num.textContent = player.scores[i];
-          num.style.color = isSlotSelected ? '#ffffff' : m.hex;
+          // Vybrané skóre je sytou barvou figurky, nevybrané je bílé
+          num.style.color = isSlotSelected ? m.hex : '#f8fafc';
 
           hit.appendChild(num);
-          hit.addEventListener('click', () => {
-            state.selectedPlayerId = player.id;
-            state.selectedScoreIdx = i;
-            render();
-          });
+          bindScoreInteraction(hit, player, i, zone, m);
 
           scoresRow.appendChild(hit);
         }
@@ -845,14 +1125,19 @@
 
     document.querySelectorAll('.quick-name-chip').forEach(chip => {
       chip.addEventListener('click', () => {
+        vibrate(12);
         renameInput.value = chip.textContent;
         renameInput.focus();
       });
     });
 
-    cancelRenameBtn.addEventListener('click', closeRenameModal);
+    cancelRenameBtn.addEventListener('click', () => {
+      vibrate(12);
+      closeRenameModal();
+    });
 
     saveRenameBtn.addEventListener('click', () => {
+      vibrate(18);
       const player = state.players.find(p => p.id === renamingPlayerId);
       if (player) {
         const clean = renameInput.value.trim();
@@ -875,6 +1160,7 @@
       const player = state.players.find(p => p.id === state.selectedPlayerId);
       if (!player) return;
 
+      vibrate(16);
       const idx = state.dualMode ? state.selectedScoreIdx : 0;
       const delta = amount * state.sign;
       const signStr = delta >= 0 ? `+${delta}` : `${delta}`;
@@ -892,6 +1178,7 @@
     });
 
     function toggleSign() {
+      vibrate(15);
       state.sign *= -1;
       render();
     }
@@ -900,12 +1187,14 @@
     numSignBtn.addEventListener('click', toggleSign);
 
     openNumpadBtn.addEventListener('click', () => {
+      vibrate(15);
       state.numpadOpen = true;
       state.numBuf = '';
       render();
     });
 
     closeNumpadBtn.addEventListener('click', () => {
+      vibrate(15);
       state.numpadOpen = false;
       state.numBuf = '';
       render();
@@ -913,6 +1202,7 @@
 
     document.querySelectorAll('[data-d]').forEach(btn => {
       btn.addEventListener('click', () => {
+        vibrate(12);
         if (state.numBuf.length >= 3) return;
         if (state.numBuf === '0') state.numBuf = '';
         state.numBuf += btn.dataset.d;
@@ -921,6 +1211,7 @@
     });
 
     numBackBtn.addEventListener('click', () => {
+      vibrate(12);
       state.numBuf = state.numBuf.slice(0, -1);
       render();
     });
@@ -928,12 +1219,14 @@
     numOkBtn.addEventListener('click', () => {
       const val = parseInt(state.numBuf, 10);
       if (val > 0) applyDelta(val);
+      else vibrate(12);
       state.numBuf = '';
       state.numpadOpen = false;
       render();
     });
 
     dualBtn.addEventListener('click', () => {
+      vibrate(18);
       if (state.dualMode) {
         pushSnapshot('Součet 2× skóre', '#60a5fa');
         state.players.forEach(p => {
@@ -950,6 +1243,7 @@
 
     addPlayerBtn.addEventListener('click', () => {
       if (state.players.length >= 6) return;
+      vibrate(18);
       const nextId = state.players.length > 0 ? Math.max(...state.players.map(p => p.id)) + 1 : 1;
       const used = state.players.map(p => p.colorIdx);
       let free = MEEPLES.findIndex((_, i) => !used.includes(i));
@@ -967,6 +1261,7 @@
     });
 
     resetBtn.addEventListener('click', () => {
+      vibrate(25);
       if (!confirm('Vynulovat skóre?')) return;
       pushSnapshot('Reset', '#94a3b8');
       state.players.forEach(p => p.scores = [0, 0]);
@@ -975,8 +1270,8 @@
       render();
     });
 
-    // Načtení uložené partie při spuštění
     loadFromStorage();
+    syncWakeLock();
     render();
   </script>
 </body>
